@@ -1,25 +1,35 @@
 import os
+import time
+
 from chonkie import CodeChunker, QdrantHandshake, AutoEmbeddings
 import tiktoken
+
+from utils import compute_time_elapsed, get_extension
 
 tokenizer = tiktoken.get_encoding("gpt2")
 embeddings = AutoEmbeddings.get_embeddings(model="all-MiniLM-L6-v2")
 
 
-def read_python_files(directory, language_extension=".py"):
+def read_python_files(directory, language_extension=".py", exclude_dirs=None):
     """
     Recursively read all Python files from a directory and return their contents as strings.
 
     Args:
-        :param directory:
-        :param language_extension:
+        :param directory: Root directory to scan
+        :param language_extension: File extension to filter (default: ".py")
+        :param exclude_dirs: List of directory names to exclude (default: ['.git', '__pycache__', 'venv', '.venv', 'node_modules'])
     Returns:
         list: List of strings, where each string is the content of a Python file
-
     """
+    if exclude_dirs is None:
+        exclude_dirs = ['.git', '__pycache__', 'venv', '.venv', '.idea', 'build', 'dist']
+
     codes = []
 
     for root, dirs, files in os.walk(directory):
+        # Filter out excluded directories in-place
+        dirs[:] = [d for d in dirs if d not in exclude_dirs]
+
         for file in files:
             if file.endswith(language_extension):
                 filepath = os.path.join(root, file)
@@ -32,32 +42,16 @@ def read_python_files(directory, language_extension=".py"):
 
     return codes
 
-def get_extension(language):
-    """Get file extension for a programming language."""
-    extensions = {
-        "python": ".py",
-        "javascript": ".js",
-        "typescript": ".ts",
-        "java": ".java",
-        "cpp": ".cpp",
-        "c": ".c",
-        "go": ".go",
-        "rust": ".rs",
-        "ruby": ".rb",
-        "php": ".php",
-        "swift": ".swift",
-        "kotlin": ".kt",
-        "scala": ".scala",
-    }
-    return extensions.get(language, f".pf")
-
+@compute_time_elapsed()
 def chunk_and_ingest_codebase(
         directory: str,
         language: str = "python",
         collection_name: str = "codebase_chunks",
         qdrant_url: str = "http://localhost:6333",
         qdrant_api_key: str = None,
-        chunk_size: int = 2048
+        chunk_size: int = 2048,
+        should_ingest: bool = False,
+        debug_mode: bool = False
 ):
     """
     Chunk an entire codebase and ingest it into Qdrant using Chonkie's Handshake.
@@ -69,14 +63,16 @@ def chunk_and_ingest_codebase(
         qdrant_url: URL of Qdrant server (or cloud URL)
         qdrant_api_key: API key for Qdrant Cloud (optional for local)
         chunk_size: Maximum tokens per chunk
+        should_ingest: will govern to ingest into vector search engine or not
+        debug_mode: will govern to print logs in debug mode
     """
 
     # Step 1: Initialize the CodeChunker
     chunker = CodeChunker(
         language=language,
         chunk_size=chunk_size,
-        include_nodes=True,
-        tokenizer="gpt2"  # or "gpt2" or "cl100k_base" (GPT-4 encoding) etc
+        # include_nodes=True,
+        # tokenizer="gpt2"  # or "gpt2" or "cl100k_base" (GPT-4 encoding) etc
     )
 
     codes = read_python_files(directory=directory, language_extension=get_extension(language))
@@ -95,10 +91,16 @@ def chunk_and_ingest_codebase(
         collection_name=collection_name,
     )
 
-    for doc_chunks in batch_chunks:
-        for chunk in doc_chunks:
-            print(f"Chunk: {chunk.text}")
-            handshake.write(chunk)
+    start_time = time.time()
+    if should_ingest:
+        for doc_chunks in batch_chunks:
+            for chunk in doc_chunks:
+                if debug_mode:
+                    print(f"Chunk: {chunk.text}")
+                handshake.write(chunk)
+
+    end_time = time.time()
+    print(f"\nIngestion Time: {end_time - start_time:.2f} seconds")
 
     return handshake
 
@@ -122,9 +124,9 @@ def search_codebase(handshake, query, limit):
 
 if __name__ == "__main__":
     # Configuration
-    CODEBASE_DIR = "/Users/pavanmantha/Pavans/PracticeExamples/DataScience_Practice/Advanced-AI-Apps/agent2agent-server"  # Your codebase path
+    CODEBASE_DIR = "/Users/pavanmantha/Downloads/ai_code"  # Your codebase path
     LANGUAGE = "python"
-    COLLECTION_NAME = "a2a_server_collection"
+    COLLECTION_NAME = "code_collection_2"
 
     # For local Qdrant
     QDRANT_URL = "http://localhost:6333"
@@ -141,7 +143,9 @@ if __name__ == "__main__":
         collection_name=COLLECTION_NAME,
         qdrant_url=QDRANT_URL,
         qdrant_api_key=QDRANT_API_KEY,
-        chunk_size=2048
+        chunk_size=2048,
+        should_ingest=False,
+        debug_mode=False
     )
 
     # Example searches
@@ -150,5 +154,8 @@ if __name__ == "__main__":
     print("=" * 80)
 
     # Search for specific functionality
-    search_codebase(handshake, "Inmemory cache design", limit=3)
+    # example1: def get_deepseek_v32_tokenizer(tokenizer: HfTokenizer) -> HfTokenizer:
+    # example2: self.scheduler.get_kv_connector()
+    # example3: logger.info(f\"Selecting retriever {result.ind}: {result.reason}.\")
+    search_codebase(handshake, "QdrantVectorStore", limit=3)
     
