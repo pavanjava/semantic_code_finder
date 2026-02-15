@@ -1,0 +1,14 @@
+[project]
+name = "code-search"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "chonkie>=1.5.5",
+    "qdrant-client>=1.16.2",
+    "sentence-transformers>=5.2.2",
+    "fastembed>=0.7.4",
+    "transformers>=5.1.0",
+    "tree_sitter_language_pack>=0.13.0",
+    "tiktoken>=0.12.0"
+]
