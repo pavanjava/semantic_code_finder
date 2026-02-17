@@ -4,6 +4,7 @@ import time
 from chonkie import CodeChunker, QdrantHandshake, AutoEmbeddings
 import tiktoken
 
+from semantic_code_searcher import SemanticCodeSearcher
 from utils import compute_time_elapsed, get_extension
 
 tokenizer = tiktoken.get_encoding("gpt2")
@@ -102,24 +103,15 @@ def chunk_and_ingest_codebase(
     end_time = time.time()
     print(f"\nIngestion Time: {end_time - start_time:.2f} seconds")
 
-    return handshake
-
 
 # Example Usage
-def search_codebase(handshake, query, limit):
+def search_codebase(query, limit):
     print(f"\nSearching for: '{query}'")
     print("-" * 80)
 
-    results = handshake.search(query=query, limit=limit)
-
-    for i, result in enumerate(results, 1):
-        print(f"\n[Result {i}] Score: {result['score']:.4f}")
-        print(f"File: {result.get('filepath', 'Unknown')}")
-        print(f"Chunk {result.get('chunk_index', 'N/A')} | Tokens: {result.get('token_count', 'N/A')}")
-        print(f"\nCode:\n{result['text']}...")
-        print("-" * 80)
-
-    return results
+    coder_searcher = SemanticCodeSearcher(collection_name="code_collection")
+    results = coder_searcher.search(text=query, limit=limit)
+    print(results)
 
 
 if __name__ == "__main__":
@@ -136,17 +128,17 @@ if __name__ == "__main__":
     # QDRANT_URL = "https://your-cluster.qdrant.io"
     # QDRANT_API_KEY = "your-api-key"
 
-    # Chunk and ingest the codebase
-    handshake = chunk_and_ingest_codebase(
-        directory=CODEBASE_DIR,
-        language=LANGUAGE,
-        collection_name=COLLECTION_NAME,
-        qdrant_url=QDRANT_URL,
-        qdrant_api_key=QDRANT_API_KEY,
-        chunk_size=2048,
-        should_ingest=False,
-        debug_mode=False
-    )
+    # Chunk and ingest the codebase (run for the first time)
+    # chunk_and_ingest_codebase(
+    #     directory=CODEBASE_DIR,
+    #     language=LANGUAGE,
+    #     collection_name=COLLECTION_NAME,
+    #     qdrant_url=QDRANT_URL,
+    #     qdrant_api_key=QDRANT_API_KEY,
+    #     chunk_size=2048,
+    #     should_ingest=False,
+    #     debug_mode=False
+    # )
 
     # Example searches
     print("\n" + "=" * 80)
@@ -157,5 +149,5 @@ if __name__ == "__main__":
     # example1: def get_deepseek_v32_tokenizer(tokenizer: HfTokenizer) -> HfTokenizer:
     # example2: self.scheduler.get_kv_connector()
     # example3: logger.info(f\"Selecting retriever {result.ind}: {result.reason}.\")
-    search_codebase(handshake, "QdrantVectorStore", limit=3)
+    search_codebase("QdrantVectorStore", limit=10)
     
