@@ -103,8 +103,7 @@ def chunk_and_ingest_codebase(
     end_time = time.time()
     print(f"\nIngestion Time: {end_time - start_time:.2f} seconds")
 
-
-# Example Usage
+@compute_time_elapsed()
 def search_codebase(query, limit):
     print(f"\nSearching for: '{query}'")
     print("-" * 80)
